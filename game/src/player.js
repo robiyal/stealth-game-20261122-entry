@@ -26,6 +26,7 @@ export function makePlayer(start) {
     hidden: false,
     coins: 5,
     stepTimer: 0,
+    walkPhase: 0,
     path: [{ x: at.x, y: at.y }],
     pathTimer: 0,
   };
@@ -54,6 +55,7 @@ export function updatePlayer(world, dt) {
     moveEntity(world, player, mx * speed * dt, my * speed * dt, 14);
     player.dir = Math.atan2(my, mx);
     player.hidden = false;
+    player.walkPhase += dt * (player.sneak ? 5 : player.sprint ? 11 : 8);
     // Footsteps: sprinting is loud enough for nearby guards to hear.
     player.stepTimer -= dt;
     if (player.stepTimer <= 0) {

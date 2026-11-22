@@ -109,9 +109,18 @@ export function drawHud(ctx, world) {
               ? 'SEARCHING'
               : 'RETURNING';
     const c = g.state === 'chase' ? COLORS.danger : g.state === 'patrol' ? COLORS.textDim : '#ff9a2e';
+    // Colour swatch in the guard's uniform colour — the same colour as
+    // the figure on the floor, so the list and the car match at a glance.
+    ctx.fillStyle = g.look.coat;
+    ctx.beginPath();
+    ctx.arc(x + 5, y - 4, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     ctx.fillStyle = COLORS.text;
     ctx.font = '12px monospace';
-    ctx.fillText(g.name, x, y);
+    ctx.fillText(g.name, x + 16, y);
     ctx.fillStyle = c;
     ctx.textAlign = 'right';
     ctx.fillText(label, PANEL_X + 300, y);

@@ -365,55 +365,164 @@ function drawCones(ctx, world) {
   }
 }
 
+// State mark for a guard's name tag: '!' when suspicious or hunting,
+// '?' while investigating a noise, a magnifier while searching the
+// last-seen spot. Calm patrol shows no mark — just the name.
+function guardMark(guard) {
+  if (guard.state === 'chase') return { type: 'bang', color: COLORS.danger };
+  if (guard.state === 'search') return { type: 'search', color: '#ff9a2e' };
+  if (guard.state === 'investigate') return { type: 'quest', color: '#ff9a2e' };
+  if (guard.suspicion >= 50) return { type: 'bang', color: '#ff9a2e' };
+  return { type: 'none', color: null };
+}
+
+// Name tag above a guard: dark pill bordered in the guard's uniform
+// colour, state mark on the left, short name on the right. The pill is
+// the only place a guard's name appears on the floor — it is what ties
+// each figure to its line in the HUD's conductor list.
+function drawGuardNameTag(ctx, guard) {
+  const mark = guardMark(guard);
+  const name = guard.shortName;
+  ctx.font = 'bold 11px monospace';
+  const nameW = ctx.measureText(name).width;
+  const markW = mark.type === 'none' ? 0 : 12;
+  const w = nameW + markW + 14;
+  const x0 = guard.x - w / 2;
+  const y0 = guard.y - 48;
+  ctx.fillStyle = 'rgba(8, 10, 24, 0.88)';
+  ctx.fillRect(x0, y0, w, 16);
+  ctx.strokeStyle = guard.look.coat;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, 15);
+  let tx = x0 + 7;
+  ctx.textAlign = 'left';
+  if (mark.type === 'bang' || mark.type === 'quest') {
+    ctx.fillStyle = mark.color;
+    ctx.fillText(mark.type === 'bang' ? '!' : '?', tx, y0 + 12);
+    tx += 12;
+  } else if (mark.type === 'search') {
+    ctx.strokeStyle = mark.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tx + 4, y0 + 8, 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx + 6.5, y0 + 10.5);
+    ctx.lineTo(tx + 9.5, y0 + 13.5);
+    ctx.stroke();
+    tx += 12;
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(name, tx, y0 + 12);
+}
+
 function drawGuard(ctx, guard, now) {
+  const look = guard.look;
+  const r = 12 * look.scale;
+  const swing = Math.sin(guard.walkPhase) * 4;
   const bob = Math.sin(now * 0.006 + guard.index * 2) * 1.2;
   ctx.save();
   ctx.translate(guard.x, guard.y + bob * 0.4);
-  // Lantern glow.
-  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+  // Lantern glow — BRAM's lantern burns brightest.
+  const glowR = look.feature === 'lantern' ? 34 : 28;
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowR);
   glow.addColorStop(0, 'rgba(255, 179, 71, 0.35)');
   glow.addColorStop(1, 'rgba(255, 179, 71, 0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, 30, 0, Math.PI * 2);
+  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
   ctx.fill();
-  // Body: navy uniform, brass buttons, cap.
   ctx.rotate(guard.dir);
-  ctx.fillStyle = COLORS.guardNavy;
+  // Walking feet: dark shoes at the sides, swinging with the stride.
+  ctx.fillStyle = '#10101c';
   ctx.beginPath();
-  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.ellipse(swing, -(r + 1), 3.5, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = COLORS.guardTrim;
-  ctx.fillRect(-2, -12, 4, 24);
-  ctx.fillStyle = '#0e1430';
   ctx.beginPath();
-  ctx.arc(11, 0, 6, 0, Math.PI * 2);
+  ctx.ellipse(-swing, r + 1, 3.5, 5, 0, 0, Math.PI * 2);
   ctx.fill();
+  // Shoulder nubs: the coat's silhouette widens at the arms.
+  ctx.fillStyle = look.coat;
+  ctx.beginPath();
+  ctx.ellipse(-1, -(r + 0.5), 2.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-1, r + 0.5, 2.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // PIET's long coat: a skirt trailing behind the torso.
+  if (look.feature === 'mustache') {
+    ctx.fillStyle = look.coat;
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.55, 0, r * 0.85, r * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Torso: the uniform coat, trim stripe down the front.
+  ctx.fillStyle = look.coat;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = look.trim;
+  ctx.fillRect(-2, -r, 4, r * 2);
+  // Gold badge on the chest.
+  ctx.fillStyle = COLORS.lootGold;
+  ctx.beginPath();
+  ctx.arc(r * 0.3, -r * 0.5, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Head: skin, facing the way the guard walks.
+  const hx = r * 0.85;
+  ctx.fillStyle = look.skin;
+  ctx.beginPath();
+  ctx.arc(hx, 0, 5.5, 0, Math.PI * 2);
+  ctx.fill();
+  if (look.hat === 'peaked') {
+    // Peaked cap: dark crown over the back of the head, brim forward.
+    ctx.fillStyle = look.cap;
+    ctx.beginPath();
+    ctx.arc(hx, 0, 6, Math.PI * 0.5, Math.PI * 1.5);
+    ctx.fill();
+    ctx.fillRect(hx + 3, -3, 5, 6);
+  } else {
+    // Hair: a dark arc over the head; ROSA wears hers in a bun.
+    ctx.fillStyle = look.hair;
+    ctx.beginPath();
+    ctx.arc(hx, 0, 6, Math.PI * 0.5, Math.PI * 1.5);
+    ctx.fill();
+    if (look.feature === 'bun') {
+      ctx.beginPath();
+      ctx.arc(hx - 6, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (look.feature === 'mustache') {
+    // PIET's mustache: a dark band across the front of the face.
+    ctx.strokeStyle = '#2e1d0e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hx + 4, -3);
+    ctx.lineTo(hx + 4, 3);
+    ctx.stroke();
+  }
+  // Lantern held at the side, a warm dot in the dark.
   ctx.fillStyle = COLORS.lampGlow;
   ctx.beginPath();
-  ctx.arc(13, 0, 2.5, 0, Math.PI * 2);
+  ctx.arc(0, r + 2, look.feature === 'lantern' ? 3.5 : 2.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-  // Suspicion pip above the head.
+  // Suspicion pip above the head — bar only, the mark lives in the tag.
   if (guard.suspicion > 5) {
     const frac = guard.suspicion / 100;
     ctx.fillStyle = '#00000088';
     ctx.fillRect(guard.x - 12, guard.y - 26, 24, 5);
     ctx.fillStyle = guard.suspicion >= 100 ? COLORS.danger : guard.suspicion >= 50 ? '#ff9a2e' : '#ffd75e';
     ctx.fillRect(guard.x - 12, guard.y - 26, 24 * frac, 5);
-    if (guard.suspicion >= 50) {
-      ctx.fillStyle = guard.suspicion >= 100 ? COLORS.danger : '#ff9a2e';
-      ctx.font = 'bold 11px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(guard.suspicion >= 100 ? '!' : '?', guard.x, guard.y - 30);
-      ctx.textAlign = 'left';
-    }
   }
+  drawGuardNameTag(ctx, guard);
 }
 
 function drawPlayer(ctx, world, now) {
   const p = world.player;
   if (!p) return;
+  const swing = Math.sin(p.walkPhase) * 4;
   ctx.save();
   ctx.globalAlpha = p.hidden ? 0.45 : 1;
   ctx.translate(p.x, p.y);
@@ -425,23 +534,68 @@ function drawPlayer(ctx, world, now) {
   ctx.beginPath();
   ctx.arc(0, 0, 28, 0, Math.PI * 2);
   ctx.fill();
-  ctx.rotate(p.dir);
-  ctx.fillStyle = COLORS.playerCloak;
-  ctx.beginPath();
-  ctx.arc(0, 0, 14, 0, Math.PI * 2);
-  ctx.fill();
   // A light ring so the Fox pops against the floor at thumbnail size.
   ctx.strokeStyle = 'rgba(232, 177, 60, 0.75)';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(0, 0, 15.5, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.rotate(p.dir);
+  // Crouch while sneaking: the Fox squashes along the way he moves.
+  ctx.scale(p.sneak ? 0.82 : 1, 1);
+  // Walking feet: dark shoes at the sides, swinging with the stride.
+  ctx.fillStyle = '#0d0d18';
+  ctx.beginPath();
+  ctx.ellipse(swing, -13.5, 3.5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-swing, 13.5, 3.5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Satchel: the Fox's brown bag, slung at the back hip.
+  ctx.fillStyle = '#6b4a26';
+  ctx.fillRect(-13, 6, 8, 10);
+  ctx.strokeStyle = '#2e1d0e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-13, 6, 8, 10);
+  // Cloak: dark, hooded, amber trim along the hem.
+  ctx.fillStyle = COLORS.playerCloak;
+  ctx.beginPath();
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = COLORS.playerScarf;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 13, Math.PI * 0.6, Math.PI * 1.4);
+  ctx.stroke();
+  // Scarf: amber band across the neck.
   ctx.fillStyle = COLORS.playerScarf;
   ctx.fillRect(-3, -14, 6, 9);
+  // Hooded head: dark hood ring around the pale face, mask band across it.
+  ctx.fillStyle = COLORS.playerCloak;
+  ctx.beginPath();
+  ctx.arc(9, 0, 6.5, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = '#e8e2d0';
   ctx.beginPath();
-  ctx.arc(10, 0, 5.5, 0, Math.PI * 2);
+  ctx.arc(10.5, 0, 4.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#10101c';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(11.5, -3.5);
+  ctx.lineTo(11.5, 3.5);
+  ctx.stroke();
+  // Sprint: speed lines trail behind the Fox.
+  if (p.sprint) {
+    ctx.strokeStyle = 'rgba(232, 177, 60, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-20, -7);
+    ctx.lineTo(-14, -7);
+    ctx.moveTo(-22, 7);
+    ctx.lineTo(-16, 7);
+    ctx.stroke();
+  }
   ctx.restore();
   if (p.sneak) {
     ctx.fillStyle = 'rgba(232, 226, 208, 0.8)';

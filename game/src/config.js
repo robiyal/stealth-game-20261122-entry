@@ -51,6 +51,16 @@ export const LAMP_RADIUS = 132;
 // Catching: a chasing guard this close to the player ends the level.
 export const CATCH_DIST = 20;
 
+// Guard personas: each conductor reads as a different person at a
+// glance — own uniform colour, headgear, build and tell. The HUD swatch
+// and the floor figure use the same coat colour per guard.
+export const GUARD_LOOKS = {
+  BRAM: { coat: '#1f2a5e', trim: '#d8b25c', cap: '#0e1430', hair: null, skin: '#e8b98a', scale: 1.15, hat: 'peaked', feature: 'lantern' },
+  IDA: { coat: '#1e5e52', trim: '#e8e2d0', cap: null, hair: '#2e1d12', skin: '#f0c8a0', scale: 0.92, hat: 'hair', feature: null },
+  PIET: { coat: '#5e3a1f', trim: '#d8b25c', cap: '#3a2410', hair: null, skin: '#e8b98a', scale: 1.1, hat: 'peaked', feature: 'mustache' },
+  ROSA: { coat: '#6e2440', trim: '#ffd75e', cap: null, hair: '#1e1410', skin: '#d8a070', scale: 0.95, hat: 'hair', feature: 'bun' },
+};
+
 // Colours: warm amber lamps against deep blue night.
 export const COLORS = {
   night: '#0b1026',

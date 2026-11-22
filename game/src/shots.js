@@ -43,9 +43,11 @@ export function stageShot(world, shot) {
     world.player.y = playerAt.y;
     world.player.sneak = true;
     world.player.dir = Math.PI;
-    placeGuard(world, 0, 12, 10, 0, 'patrol', 35);
+    placeGuard(world, 0, 12, 10, 0, 'patrol', 55);
     placeGuard(world, 1, 24, 17, Math.PI / 2, 'patrol', 0);
-    placeGuard(world, 2, 10, 6, Math.PI, 'patrol', 0);
+    // PIET patrols the lamp row two tiles from the Fox, facing away —
+    // close enough that his uniform, name tag and calm state all read.
+    placeGuard(world, 2, 16, 7, Math.PI, 'patrol', 0);
     world.loot[0].taken = true;
     world.lootGot = 1;
     world.time = 41;
@@ -53,6 +55,7 @@ export function stageShot(world, shot) {
     world.annotations = [
       label('VISION CONE', 15, 10, -40, -90, '#c9a227'),
       label('YOU: hidden where the cone stops', 18, 10, 30, 96, '#37d67a'),
+      label('THE FOX', 18, 10, 0, -50, '#e8b13c'),
       label('LOOT — take it, then the exit', 21, 11, 90, -70, '#ffd75e'),
       label('EXIT →', 20, 18, 90, 40, '#37d67a'),
       label('LAMPLIGHT: seen from across the room', 15, 7, -90, -70, '#ffb347'),

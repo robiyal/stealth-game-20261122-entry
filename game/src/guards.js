@@ -25,14 +25,19 @@ import { clamp, dist } from './random.js';
 import { moveEntity, tileCenter } from './collision.js';
 import { inCone, lightAt } from './vision.js';
 import { isSolidTile } from './levels.js';
+import { GUARD_LOOKS } from './config.js';
 
 export function makeGuard(def, index) {
   const [sx, sy] = def.waypoints[0];
   const start = tileCenter(sx, sy);
   const [nx, ny] = def.waypoints[1 % def.waypoints.length];
   const next = tileCenter(nx, ny);
+  // "CON-1 BRAM" -> short name BRAM; the look is that guard's identity.
+  const shortName = def.name.split(' ').pop();
   return {
     name: def.name,
+    shortName,
+    look: GUARD_LOOKS[shortName] || GUARD_LOOKS.BRAM,
     index,
     x: start.x,
     y: start.y,
@@ -49,6 +54,7 @@ export function makeGuard(def, index) {
     stimulus: null,
     lastSeen: null,
     stepTimer: 0,
+    walkPhase: index * 1.7, // staggered mid-stride pose per guard
   };
 }
 
@@ -75,6 +81,8 @@ function nearestWalkable(world, cx, cy, rng, radiusTiles) {
 
 export function updateGuard(world, guard, dt) {
   const player = world.player;
+  const ox = guard.x;
+  const oy = guard.y;
 
   // --- perception: can this guard see the player right now? ---
   let sees = false;
@@ -176,6 +184,11 @@ export function updateGuard(world, guard, dt) {
       guard.wpIndex = (best + 1) % guard.waypoints.length;
       guard.state = 'patrol';
     }
+  }
+
+  // Walk cycle: the stride swings only while the guard actually moves.
+  if (Math.hypot(guard.x - ox, guard.y - oy) > 0.05) {
+    guard.walkPhase += dt * (guard.state === 'chase' ? 11 : 8);
   }
 
   // Footstep sound when a guard walks close enough to hear.
