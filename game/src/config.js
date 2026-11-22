@@ -46,7 +46,7 @@ export const COIN_COUNT = 5;
 export const SPRINT_NOISE_RADIUS = 82;
 
 // Light: lamp pools and shadow.
-export const LAMP_RADIUS = 96;
+export const LAMP_RADIUS = 132;
 
 // Catching: a chasing guard this close to the player ends the level.
 export const CATCH_DIST = 20;

@@ -36,21 +36,43 @@ function drawFloor(ctx, world) {
       const worn = hash2(x, y);
       if (floor === 'carpet' || ch === ',') {
         ctx.fillStyle = worn > 0.85 ? COLORS.carpetDark : COLORS.carpet;
-      } else if (floor === 'sleeper' && ch === '.') {
-        ctx.fillStyle = worn > 0.8 ? COLORS.woodDark : COLORS.wood;
+      } else if (floor === 'sleeper') {
+        // Blue-grey floor tiles, checker shade, grout lines.
+        ctx.fillStyle = (x + y) % 2 === 0 ? COLORS.steel : COLORS.steelLight;
       } else {
-        ctx.fillStyle = worn > 0.85 ? COLORS.woodDark : COLORS.wood;
+        // Wood planks: three tones so the floor reads as boards, not flat.
+        ctx.fillStyle = worn > 0.9 ? '#5a3d28' : worn > 0.75 ? COLORS.woodDark : COLORS.wood;
       }
       ctx.fillRect(px, py, TILE, TILE);
-      // Plank seams and carpet weave.
+      // Tile grout / plank seams.
       ctx.strokeStyle = COLORS.floorLine;
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 0.5, py + 0.5, TILE, TILE);
-      if (ch === '.' || ch === 'P' || ch === 'E' || ch === '*' || ch === 'L' || ch === 'h') {
+      if (floor === 'wood') {
+        // Staggered plank joints: the seam lands left or right by row.
+        const joint = hash2(x, y + 100) > 0.5 ? 10 : 22;
         ctx.beginPath();
-        ctx.moveTo(px, py + TILE / 2);
-        ctx.lineTo(px + TILE, py + TILE / 2);
+        ctx.moveTo(px + joint, py);
+        ctx.lineTo(px + joint, py + TILE);
         ctx.stroke();
+        if (ch === '.' || ch === 'P' || ch === 'E' || ch === '*' || ch === 'L' || ch === 'h') {
+          ctx.beginPath();
+          ctx.moveTo(px, py + TILE / 2);
+          ctx.lineTo(px + TILE, py + TILE / 2);
+          ctx.stroke();
+        }
+      } else if (floor === 'carpet' || ch === ',') {
+        // Woven diamond on some carpet tiles.
+        if (worn > 0.72 && worn < 0.9) {
+          ctx.strokeStyle = 'rgba(201, 162, 39, 0.25)';
+          ctx.beginPath();
+          ctx.moveTo(px + TILE / 2, py + 7);
+          ctx.lineTo(px + TILE - 7, py + TILE / 2);
+          ctx.lineTo(px + TILE / 2, py + TILE - 7);
+          ctx.lineTo(px + 7, py + TILE / 2);
+          ctx.closePath();
+          ctx.stroke();
+        }
       }
     }
   }
@@ -62,18 +84,141 @@ function drawFloor(ctx, world) {
     ctx.fillRect(14 * TILE, PLAY_Y, 2, PLAY_H);
     ctx.fillRect(16 * TILE - 2, PLAY_Y, 2, PLAY_H);
   }
+  // The dining car gets a carpet runner down the central aisle (row 9 is
+  // open floor all the way across).
+  if (floor === 'carpet') {
+    ctx.fillStyle = '#4a1c26';
+    ctx.fillRect(TILE, PLAY_Y + 9 * TILE, 28 * TILE, TILE);
+    ctx.fillStyle = '#c9a227';
+    ctx.fillRect(TILE, PLAY_Y + 9 * TILE, 28 * TILE, 2);
+    ctx.fillRect(TILE, PLAY_Y + 10 * TILE - 2, 28 * TILE, 2);
+  }
   // Brass trim along the top and bottom walls.
   ctx.fillStyle = COLORS.brass;
   ctx.fillRect(0, PLAY_Y, PLAY_W, 2);
   ctx.fillRect(0, PLAY_Y + PLAY_H - 2, PLAY_W, 2);
 }
 
+// Small floor props, one flavour per car, scattered deterministically on
+// open tiles the patrols never cross — the floor reads lived-in, not bare.
+function drawFloorProps(ctx, world) {
+  const floor = world.def.floor;
+  const blocked = new Set();
+  const key = (x, y) => x + ',' + y;
+  const near = (tx, ty, d) => {
+    for (let y = ty - d; y <= ty + d; y++)
+      for (let x = tx - d; x <= tx + d; x++) blocked.add(key(x, y));
+  };
+  for (const l of world.loot) near(l.x, l.y, 1);
+  for (const l of world.lamps) near(l.x, l.y, 1);
+  for (const h of world.hides) near(h.x, h.y, 1);
+  near(world.exit.x, world.exit.y, 1);
+  for (let y = 0; y < world.grid.length; y++)
+    for (let x = 0; x < world.grid[y].length; x++)
+      if (world.grid[y][x] === 'P') near(x, y, 1);
+  // Patrol legs: no prop where a conductor walks.
+  for (const g of world.def.guards) {
+    const wps = g.waypoints;
+    for (let i = 0; i < wps.length; i++) {
+      const [x1, y1] = wps[i];
+      const [x2, y2] = wps[(i + 1) % wps.length];
+      const dx = Math.sign(x2 - x1);
+      const dy = Math.sign(y2 - y1);
+      let x = x1;
+      let y = y1;
+      blocked.add(key(x, y));
+      while (x !== x2 || y !== y2) {
+        x += dx;
+        y += dy;
+        blocked.add(key(x, y));
+      }
+    }
+  }
+  for (let y = 0; y < world.grid.length; y++) {
+    for (let x = 0; x < world.grid[y].length; x++) {
+      const ch = world.grid[y][x];
+      if (ch !== '.' && ch !== ',') continue;
+      if (blocked.has(key(x, y))) continue;
+      if (hash2(x, y) < 0.93) continue;
+      const px = x * TILE + TILE / 2;
+      const py = PLAY_Y + y * TILE + TILE / 2;
+      const kind = hash2(x + 50, y + 50) > 0.5;
+      if (floor === 'wood') {
+        // Baggage: a small strapped crate, or a coiled rope.
+        if (kind) {
+          ctx.fillStyle = '#6b4a26';
+          ctx.fillRect(px - 6, py - 6, 12, 12);
+          ctx.strokeStyle = '#2e1d0e';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(px - 6, py - 6, 12, 12);
+          ctx.beginPath();
+          ctx.moveTo(px, py - 6);
+          ctx.lineTo(px, py + 6);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = 'rgba(201, 162, 39, 0.7)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(px, py, 6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(px, py, 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else if (floor === 'carpet') {
+        // Dining: a dropped plate, or a wine glass.
+        if (kind) {
+          ctx.fillStyle = '#e8e2d0';
+          ctx.beginPath();
+          ctx.arc(px, py, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#c9a227';
+          ctx.beginPath();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = 'rgba(120, 200, 210, 0.8)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(px, py - 2, 4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(px, py + 2);
+          ctx.lineTo(px, py + 6);
+          ctx.stroke();
+        }
+      } else {
+        // Sleeper: a folded blanket, or a book left on the floor.
+        if (kind) {
+          ctx.fillStyle = '#2f6f6a';
+          ctx.fillRect(px - 7, py - 4, 14, 8);
+          ctx.fillStyle = '#255954';
+          ctx.fillRect(px - 7, py - 4, 14, 3);
+        } else {
+          ctx.fillStyle = '#c9a227';
+          ctx.fillRect(px - 5, py - 3, 10, 6);
+          ctx.fillStyle = '#8a6d3b';
+          ctx.fillRect(px - 5, py - 3, 2, 6);
+        }
+      }
+    }
+  }
+}
+
 function drawLamps(ctx, world) {
   for (const lamp of world.lamps) {
     const at = tileCenter(lamp.x, lamp.y);
+    // A wide warm halo first, so lit floor reads against the shadows.
+    const halo = ctx.createRadialGradient(at.x, at.y, LAMP_RADIUS * 0.5, at.x, at.y, LAMP_RADIUS * 1.5);
+    halo.addColorStop(0, 'rgba(255, 179, 71, 0.10)');
+    halo.addColorStop(1, 'rgba(255, 179, 71, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, LAMP_RADIUS * 1.5, 0, Math.PI * 2);
+    ctx.fill();
     const glow = ctx.createRadialGradient(at.x, at.y, 4, at.x, at.y, LAMP_RADIUS);
-    glow.addColorStop(0, 'rgba(255, 179, 71, 0.38)');
-    glow.addColorStop(0.6, 'rgba(255, 179, 71, 0.12)');
+    glow.addColorStop(0, 'rgba(255, 179, 71, 0.5)');
+    glow.addColorStop(0.55, 'rgba(255, 179, 71, 0.18)');
     glow.addColorStop(1, 'rgba(255, 179, 71, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
@@ -124,11 +269,28 @@ function drawCover(ctx, world, now) {
           ctx.beginPath();
           ctx.arc(px + TILE / 2, py + TILE / 2, 3, 0, Math.PI * 2);
           ctx.fill();
-        } else {
+        } else if (world.def.floor === 'sleeper') {
+          // Bunk: teal mattress, white pillow, brass rail.
           ctx.fillStyle = '#2f6f6a';
-          ctx.fillRect(px + 3, py + 5, TILE - 6, TILE - 10);
-          ctx.fillStyle = '#255954';
-          ctx.fillRect(px + 3, py + 5, TILE - 6, 6);
+          ctx.fillRect(px + 3, py + 4, TILE - 6, TILE - 8);
+          ctx.fillStyle = '#e8e2d0';
+          ctx.fillRect(px + 5, py + 6, 8, TILE - 12);
+          ctx.strokeStyle = '#c9a227';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(px + 3.5, py + 4.5, TILE - 7, TILE - 9);
+        } else {
+          // Mail sack: tan bundle with a tied neck.
+          ctx.fillStyle = '#a8845a';
+          ctx.beginPath();
+          ctx.arc(px + TILE / 2, py + TILE / 2 + 3, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#7a5c38';
+          ctx.fillRect(px + TILE / 2 - 3, py + 3, 6, 8);
+          ctx.strokeStyle = '#54371c';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(px + TILE / 2, py + TILE / 2 + 3, 10, 0, Math.PI * 2);
+          ctx.stroke();
         }
       } else if (ch === 'h') {
         // Hide spot: a luggage rack, dashed outline until used.
@@ -208,12 +370,12 @@ function drawGuard(ctx, guard, now) {
   ctx.save();
   ctx.translate(guard.x, guard.y + bob * 0.4);
   // Lantern glow.
-  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
   glow.addColorStop(0, 'rgba(255, 179, 71, 0.35)');
   glow.addColorStop(1, 'rgba(255, 179, 71, 0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, 26, 0, Math.PI * 2);
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
   ctx.fill();
   // Body: navy uniform, brass buttons, cap.
   ctx.rotate(guard.dir);
@@ -256,30 +418,36 @@ function drawPlayer(ctx, world, now) {
   ctx.globalAlpha = p.hidden ? 0.45 : 1;
   ctx.translate(p.x, p.y);
   // A small warm glow so the Fox reads against the dark floor.
-  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
-  glow.addColorStop(0, 'rgba(232, 177, 60, 0.22)');
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 28);
+  glow.addColorStop(0, 'rgba(232, 177, 60, 0.28)');
   glow.addColorStop(1, 'rgba(232, 177, 60, 0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, 22, 0, Math.PI * 2);
+  ctx.arc(0, 0, 28, 0, Math.PI * 2);
   ctx.fill();
   ctx.rotate(p.dir);
   ctx.fillStyle = COLORS.playerCloak;
   ctx.beginPath();
-  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
   ctx.fill();
+  // A light ring so the Fox pops against the floor at thumbnail size.
+  ctx.strokeStyle = 'rgba(232, 177, 60, 0.75)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 15.5, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.fillStyle = COLORS.playerScarf;
-  ctx.fillRect(-3, -11, 6, 8);
+  ctx.fillRect(-3, -14, 6, 9);
   ctx.fillStyle = '#e8e2d0';
   ctx.beginPath();
-  ctx.arc(8, 0, 4.5, 0, Math.PI * 2);
+  ctx.arc(10, 0, 5.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   if (p.sneak) {
     ctx.fillStyle = 'rgba(232, 226, 208, 0.8)';
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('SNEAK', p.x, p.y - 18);
+    ctx.fillText('SNEAK', p.x, p.y - 22);
     ctx.textAlign = 'left';
   }
 }
@@ -345,6 +513,7 @@ export function drawAnnotations(ctx, world) {
 
 export function drawPlayfield(ctx, world, now) {
   drawFloor(ctx, world);
+  drawFloorProps(ctx, world);
   drawLamps(ctx, world);
   drawCover(ctx, world, now);
   drawLootExit(ctx, world, now);

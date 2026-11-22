@@ -51,7 +51,7 @@ export function updatePlayer(world, dt) {
     mx /= len;
     my /= len;
     const speed = player.sneak ? PLAYER_SNEAK : player.sprint ? PLAYER_SPRINT : PLAYER_WALK;
-    moveEntity(world, player, mx * speed * dt, my * speed * dt, 11);
+    moveEntity(world, player, mx * speed * dt, my * speed * dt, 14);
     player.dir = Math.atan2(my, mx);
     player.hidden = false;
     // Footsteps: sprinting is loud enough for nearby guards to hear.

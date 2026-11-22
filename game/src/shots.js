@@ -16,6 +16,7 @@ function label(text, tx, ty, dx, dy, color) {
 
 function placeGuard(world, index, tx, ty, dir, state, suspicion) {
   const g = world.guards[index];
+  if (!g) return null; // not every car has four conductors
   const p = at(tx, ty);
   g.x = p.x;
   g.y = p.y;
@@ -27,6 +28,8 @@ function placeGuard(world, index, tx, ty, dir, state, suspicion) {
 }
 
 export function stageShot(world, shot) {
+  // Shot cars: action = Dining (Car 2), spotted = Baggage (Car 1),
+  // hidden and ghost = Sleeper (Car 3); main.js boots the matching car.
   world.shot = shot;
   world.annotations = [];
   world.fieldNotes = null;
@@ -61,7 +64,7 @@ export function stageShot(world, shot) {
       'sneak behind low cover',
     ];
   } else if (shot === 'spotted') {
-    // Caught in the open: red cone, the conductor closing in.
+    // Caught in the open in the Baggage Car: red cone, the conductor closing in.
     const playerAt = at(14, 10);
     world.player.x = playerAt.x;
     world.player.y = playerAt.y;
@@ -69,7 +72,6 @@ export function stageShot(world, shot) {
     world.player.dir = Math.PI;
     placeGuard(world, 0, 10, 10, 0, 'chase', 100);
     placeGuard(world, 1, 24, 17, Math.PI / 2, 'patrol', 0);
-    placeGuard(world, 2, 10, 6, Math.PI, 'patrol', 0);
     world.loot[0].taken = true;
     world.lootGot = 1;
     world.time = 72;
@@ -77,16 +79,18 @@ export function stageShot(world, shot) {
     world.alarm = 'ALARM';
     world.banner = { text: 'SPOTTED!', sub: 'Break line of sight and hide', color: '#ff5a4e', ttl: 999 };
   } else if (shot === 'hidden') {
-    // Inside the luggage rack while a conductor searches the last-seen spot.
+    // Inside the luggage rack in the Sleeper Car while a conductor searches
+    // the last-seen spot.
     const hideAt = at(8, 17);
     world.player.x = hideAt.x;
     world.player.y = hideAt.y;
     world.player.hidden = true;
     world.player.sneak = true;
-    placeGuard(world, 0, 12, 17, Math.PI, 'search', 40);
-    world.guards[0].lastSeen = { x: hideAt.x, y: hideAt.y };
-    placeGuard(world, 1, 24, 17, Math.PI / 2, 'patrol', 0);
-    placeGuard(world, 2, 10, 6, Math.PI, 'patrol', 0);
+    placeGuard(world, 2, 12, 17, Math.PI, 'search', 40);
+    world.guards[2].lastSeen = { x: hideAt.x, y: hideAt.y };
+    placeGuard(world, 0, 12, 9, Math.PI / 2, 'patrol', 0);
+    placeGuard(world, 1, 18, 9, Math.PI, 'patrol', 0);
+    placeGuard(world, 3, 24, 17, Math.PI, 'patrol', 0);
     world.loot[0].taken = true;
     world.loot[1].taken = true;
     world.lootGot = 2;
@@ -97,20 +101,21 @@ export function stageShot(world, shot) {
       label('SEARCHING your last-seen spot', 12, 17, 120, -60, '#ff9a2e'),
     ];
   } else if (shot === 'ghost') {
-    // The end of a perfect run: every prize, never spotted.
+    // The end of a perfect run through the Sleeper Car: every prize, never spotted.
     world.loot.forEach((l) => {
       l.taken = true;
     });
     world.lootGot = world.loot.length;
-    world.time = 97;
+    world.time = 108;
     world.spottedCount = 0;
-    world.score = 1240;
+    // 5 prizes x 100 + time bonus (120 - 108) x 5 + ghost bonus 500.
+    world.score = 1060;
     world.endStats = {
-      time: 97,
+      time: 108,
       loot: world.loot.length,
       lootTotal: world.loot.length,
       spotted: 0,
-      score: 1240,
+      score: 1060,
     };
     world.player.path = [
       { x: 112, y: 96 },

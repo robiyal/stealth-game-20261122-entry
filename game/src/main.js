@@ -207,9 +207,12 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// Boot: a staged shot loads the Dining Car frozen; otherwise the title screen.
+// Boot: each staged shot loads its own car frozen — action = Dining (Car
+// 2), spotted = Baggage (Car 1), hidden and ghost = Sleeper (Car 3) —
+// otherwise the title screen.
+const SHOT_LEVEL = { action: 1, spotted: 0, hidden: 2, ghost: 2 };
 if (SHOT) {
-  startLevel(1);
+  startLevel(SHOT_LEVEL[SHOT] ?? 1);
   // The ghost shot stages its own end state; the others play from 'play'.
   if (SHOT !== 'ghost') world.state = 'play';
 } else {
